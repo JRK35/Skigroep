@@ -1,0 +1,22 @@
+name: Plaatsnamen ophalen
+on:
+  push:
+    paths: ['tools/places.py', '.github/workflows/places.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  places:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python tools/places.py
+      - name: Opslaan in de repository
+        run: |
+          git config user.name "skigroep-bot"
+          git config user.email "skigroep-bot@users.noreply.github.com"
+          git add places.json
+          git diff --cached --quiet || (git commit -m "Plaatsnamen bijgewerkt uit OpenStreetMap" && git push)

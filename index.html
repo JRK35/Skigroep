@@ -495,9 +495,25 @@ async function fetchPlaces(force){
   if(fetchPlaces.busy) return fetchPlaces.busy;
   const q = `[out:json][timeout:60];(way["aerialway"]["name"](${BBOX});node["aerialway"="station"]["name"](${BBOX});way["piste:type"="downhill"](${BBOX});nwr["amenity"~"^(restaurant|bar|pub|cafe|fast_food)$"]["name"](${BBOX});node["natural"="peak"]["name"](${BBOX});node["place"~"^(village|hamlet|locality|neighbourhood)$"]["name"](${BBOX}););out tags geom;`;
   fetchPlaces.busy = (async () => {
+    // 1. De lijst die GitHub zelf ophaalt en bij de app zet (snel, werkt ook offline)
+    try{
+      const r = await fetch('places.json', {cache:'no-cache'});
+      if(r.ok){
+        const j = await r.json();
+        if(j && j.v === PLACES_VERSION && Array.isArray(j.f) && j.f.length){
+          places = {v:PLACES_VERSION, t:Date.now(), f:j.f};
+          try{ localStorage.setItem('ski-places', JSON.stringify(places)) }catch(e){}
+          infoPlaces(); buildPoi(); load();
+          return places;
+        }
+      }
+    }catch(e){}
+    // 2. Reserve: rechtstreeks bij OpenStreetMap, maximaal 25 seconden wachten
     for(const url of OVERPASS){
       try{
-        const r = await fetch(url, {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+        const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 25000);
+        const r = await fetch(url, {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}, signal:ctl.signal});
+        clearTimeout(timer);
         if(!r.ok) continue;
         const j = await r.json(), f = [], seen = new Set();
         for(const el of j.elements || []){

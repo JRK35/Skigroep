@@ -4,9 +4,9 @@
 // - Android: verstuurt wachtende berichten zodra er bereik is, ook als de app dicht is
 importScripts('outbox.js');
 
-const APP = 'skigroep-app-v1';
+const APP = 'skigroep-app-v2';
 const TILES = 'skigroep-tiles';
-const SHELL = ['./', './index.html', './outbox.js', './manifest.json', './icon-192.png', './icon-512.png',
+const SHELL = ['./', './index.html', './outbox.js', './manifest.json', './icon-192.png', './icon-512.png', './places.json',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'];
 
 self.addEventListener('install', e => {
