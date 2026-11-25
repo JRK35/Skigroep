@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1720">
+<meta name="apple-mobile-web-app-title" content="Skigroep">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Skigroep Tignes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: kort en duidelijk, bruikbaar met handschoenen aan
+   IDEA: pistebordjes — blauw, rood, zwart
+   PICTURE: grote knoppen + pistekaart van Tignes met ieders positie en de bestemming
+   COLOUR/TYPE: sneeuwwit, pisterood als accent, Barlow Condensed
+   LAYOUT: één kolom, duim-bereik, onderaan uitleg */
+:root{color-scheme:light dark;--bg:light-dark(#f4f7fa,#0f1720);--card:light-dark(#fff,#18232f);--ink:light-dark(#0f1720,#eef3f7);--mute:light-dark(#5b6b7a,#93a4b4);--line:light-dark(#dde5ec,#2a3a4a);--red:#d7261e;--blue:#1565c0;--black:#111;--green:#1b8a4a;--gold:#e0a100}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+main{max-width:560px;margin:0 auto;padding:16px}
+h1,h2{font-family:"Barlow Condensed",sans-serif;margin:0;line-height:1.05}
+h1{font-size:34px}h2{font-size:24px;margin:24px 0 10px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.chip{font:inherit;font-size:14px;background:none;border:1px solid var(--line);border-radius:20px;padding:8px 14px;color:inherit;min-height:40px}
+.banner{display:none;margin-top:12px;padding:14px;border-radius:14px;background:var(--gold);color:#111;font-weight:600}
+.banner.on{display:block}
+.banner .b{margin-top:10px;width:100%}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+button{font:inherit;cursor:pointer}
+.b{min-height:76px;border:0;border-radius:14px;color:#fff;font-family:"Barlow Condensed",sans-serif;font-size:21px;font-weight:700;padding:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 2px 0 rgba(0,0,0,.25);transition:transform .08s;text-align:center;cursor:pointer}
+.b:active{transform:scale(.97)}
+.b small{font-family:Barlow,sans-serif;font-weight:400;font-size:13px;opacity:.85}
+.blue{background:var(--blue)}.redb{background:var(--red)}.blk{background:var(--black)}
+.pos{grid-column:1/-1;background:var(--green);min-height:84px;font-size:24px}
+.jeroen{grid-column:1/-1;background:repeating-linear-gradient(-45deg,#e0a100 0 18px,#111 18px 36px);min-height:84px;font-size:26px;text-shadow:0 2px 0 #000,0 0 8px #000}
+.sos{grid-column:1/-1;background:var(--red);min-height:64px;font-size:22px;outline:3px solid var(--red);outline-offset:3px}
+.auto{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.auto small{display:block;color:var(--mute);font-size:13px}
+.sw{appearance:none;width:52px;height:30px;border-radius:15px;background:var(--line);position:relative;flex:none;cursor:pointer;margin:0}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s}
+.sw:checked{background:var(--green)}.sw:checked::after{left:25px}
+.row{display:flex;gap:8px;margin-top:12px}
+input[type=text],input:not([type]){font:inherit;font-size:16px;width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);min-height:48px}
+.send{border:0;border-radius:12px;background:var(--ink);color:var(--bg);padding:0 18px;min-height:48px;font-weight:600}
+.mapwrap{position:relative}
+#map{height:360px;border-radius:14px;border:1px solid var(--line);background:var(--card)}
+.maptools{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.maptools .chip{flex:1}
+.chip.on{background:var(--gold);color:#111;border-color:var(--gold);font-weight:600}
+.hint{color:var(--mute);font-size:14px;margin:6px 0 0}
+.dest{display:none;margin-top:10px;background:var(--card);border:2px solid var(--gold);border-radius:12px;padding:10px 14px;justify-content:space-between;gap:10px;align-items:center}
+.dest.on{display:flex}
+.list{list-style:none;padding:0;margin:10px 0 0}
+.list li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.list li.old{opacity:.6}
+.list b{font-size:17px}.m{color:var(--mute);font-size:14px}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--line);color:var(--ink);margin-left:6px;vertical-align:2px}
+a.go{color:var(--blue);font-weight:600;white-space:nowrap}
+.feed li{display:block}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:12px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center;z-index:2000}
+.toast.on{opacity:1}
+details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:10px}
+summary{font-weight:600;cursor:pointer}
+code{background:var(--bg);padding:2px 6px;border-radius:6px;overflow-wrap:anywhere}
+.empty{color:var(--mute);font-size:15px}
+dialog{border:0;border-radius:16px;padding:20px;background:var(--card);color:var(--ink);width:min(92vw,400px)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.leaflet-tooltip{font-weight:600}
+.seg{display:flex;gap:6px;margin-top:10px}
+.seg button{flex:1;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px;padding:6px 4px}
+.seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+#map.tapmode{outline:3px solid var(--gold);outline-offset:2px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:10px}
+.panel h3{font:700 20px/1.1 "Barlow Condensed",sans-serif;margin:0 0 8px}
+.bar{display:grid;grid-template-columns:minmax(0,7.5em) minmax(0,1fr) 2.2em;gap:8px;align-items:center;margin:6px 0;font-size:15px}
+.bar span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar i{display:block;height:14px;border-radius:7px;background:var(--red);min-width:4px}
+.bar i.y{background:repeating-linear-gradient(-45deg,#e0a100 0 8px,#111 8px 16px)}.bar i.b{background:var(--blue)}
+.bar b{text-align:right}
+table.st{width:100%;border-collapse:collapse;font-size:15px}
+table.st th,table.st td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.st th:first-child,table.st td:first-child{text-align:left}
+.save{margin-top:6px;min-height:40px}
+.poi{width:28px;height:28px;border-radius:50%;background:#fff;border:2px solid #d7261e;display:grid;place-items:center;font-size:15px;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.poi.bar{border-color:#e0a100}
+.poi.go{width:32px;height:32px;font-size:17px;border:3px solid #1565c0}
+.poipop b{display:block;font-size:16px;margin-bottom:6px}
+.poipop button,.poipop a{display:block;width:100%;margin-top:6px;min-height:40px;border-radius:10px;border:0;background:#1565c0;color:#fff;font:600 15px Barlow,sans-serif;text-align:center;line-height:40px;text-decoration:none}
+.poipop a{background:#0f1720}
+.sugg{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.sugg button{display:flex;justify-content:space-between;gap:10px;text-align:left;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:8px 12px;font-size:15px}
+.sugg button.on{border:2px solid var(--gold);font-weight:600}
+.sugg .d{color:var(--mute);white-space:nowrap;font-weight:400}
+.days{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity}
+.days .chip{flex:none;scroll-snap-align:start;white-space:nowrap}
+.days .chip.sel{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+.days .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-left:6px;vertical-align:2px}
+.draft{margin-top:10px;background:var(--card);border:2px dashed var(--gold);border-radius:12px;padding:12px 14px}
+.draft ol{margin:8px 0;padding-left:22px}
+.types{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.types .chip.on{background:var(--gold);color:#111;border-color:var(--gold)}
+.steps{list-style:none;padding:0;margin:0}
+.steps li{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px}
+.steps li.done{opacity:.5}.steps li.now{border:2px solid var(--gold)}
+.num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--gold);color:#111;display:grid;place-items:center;font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px}
+.steps .grow{flex:1}
+.pin{width:30px;height:30px;border-radius:50%;background:var(--gold);color:#111;border:2px solid #fff;display:grid;place-items:center;font:700 16px "Barlow Condensed",sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.pin.now{background:var(--red);color:#fff}.pin.done{background:#8a98a6}
+@media(prefers-reduced-motion:reduce){.b,.sw::after{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>Skigroep Tignes</h1>
+    <button class="chip" id="meBtn">Naam instellen</button>
+  </div>
+
+  <div class="banner" id="outBanner" role="status"></div>
+  <div class="banner" id="noTopic">Nog niet gekoppeld aan jullie groep. Open de uitnodigingslink uit de groepsapp, of plak hem hier:
+    <form class="row" id="joinForm"><input id="joinIn" placeholder="Uitnodigingslink of kanaalnaam" autocomplete="off"><button class="send">Koppel</button></form></div>
+  <div class="banner" id="photoBanner">
+    📸 Er is om een foto gevraagd. Je positie is al verstuurd.
+    <label class="b blue" for="photoIn">📷 Maak foto</label>
+  </div>
+
+  <div class="grid">
+    <button class="b pos" data-pos="1">📍 Deel mijn positie<small>één tik, gaat direct naar de groep</small></button>
+    <button class="b blue" data-req="pos">📍 Waar zijn jullie?<small>ieders positie opvragen</small></button>
+    <button class="b blue" data-req="foto">📸 Foto-verzoek<small>iedereen: maak een foto</small></button>
+    <label class="b blue" for="photoIn">📷 Stuur foto<small>+ mijn positie</small></label>
+    <button class="b blue" data-msg="Verzamelen! Kom naar mijn positie" data-loc="1">Verzamelen<small>+ mijn positie</small></button>
+    <button class="b redb" data-msg="Lunchtijd! 🍽️" data-loc="1">Lunch<small>+ mijn positie</small></button>
+    <button class="b redb" data-msg="Après-ski! 🍺" data-loc="1">Après-ski<small>+ mijn positie</small></button>
+    <button class="b blk" data-msg="Wacht even op mij" data-loc="1">Wacht op mij<small>+ mijn positie</small></button>
+    <button class="b blk" data-msg="Alles goed, ik ga even mijn eigen gang">Alles oké</button>
+    <div class="auto">
+      <div><b>Automatisch delen</b><small>Stil elke 5 min je positie, zolang de app open is</small></div>
+      <input type="checkbox" class="sw" id="autoSw" aria-label="Automatisch positie delen">
+    </div>
+    <button class="b jeroen" data-msg="🚨 JEROEN NIET DOEN! 🚨" data-prio="5" data-tags="warning">🚨 Jeroen niet doen!<small>alarm voor de hele groep</small></button>
+    <button class="b sos" data-msg="🆘 HULP NODIG! Kom naar mijn positie" data-loc="1" data-prio="5">🆘 Hulp nodig</button>
+  </div>
+  <input type="file" id="photoIn" accept="image/*" capture="environment" hidden>
+
+  <form class="row" id="free">
+    <input id="freeTxt" placeholder="Eigen bericht…" maxlength="200" autocomplete="off">
+    <button class="send">Stuur</button>
+  </form>
+
+  <h2>Routes per dag</h2>
+  <div class="days" id="days"></div>
+  <div class="seg" id="mapMode" role="group" aria-label="Wat doet een tik op de kaart">
+    <button data-mode="look" class="on">👀 Kijken</button>
+    <button data-mode="here">📍 Ik ben hier</button>
+    <button data-mode="go">🎯 Ik ga hierheen</button>
+  </div>
+  <p class="hint" id="modeHint">Zoom in met twee vingers. Kies hierboven wat een tik op de kaart doet.</p>
+  <div id="map" style="margin-top:8px"></div>
+  <div class="maptools">
+    <button class="chip" id="meMapBtn">📍 Naar mij</button>
+    <button class="chip" id="fitBtn">Alles in beeld</button>
+    <button class="chip" id="poiBtn">🍽️ Eten & drinken</button>
+    <button class="chip" id="markBtn" style="flex-basis:100%">🗺️ Route maken</button>
+  </div>
+  <p class="hint" id="markHint" hidden>Tik op de kaart op de volgende plek van de route. Zo maak je stap 1, 2, 3…</p>
+  <div class="draft" id="draft" hidden>
+    <b id="draftTitle">Nieuwe route</b>
+    <ol id="draftList"></ol>
+    <div class="row"><button class="chip" id="draftClear" style="flex:1">Wis</button><button class="send" id="draftSend" style="flex:2">Stuur route naar groep</button></div>
+  </div>
+  <div id="plan" style="margin-top:12px"></div>
+
+  <h2>Waar is iedereen</h2>
+  <ul class="list" id="people"><li class="empty">Nog niemand heeft een positie gedeeld.</li></ul>
+  <p class="hint">Live posities: ouder dan 30 min wordt grijs gemarkeerd als oud, ouder dan 3 uur verdwijnt van de kaart. In het logboek blijft alles staan.</p>
+
+  <h2 id="feedTitle">Logboek vandaag</h2>
+  <p class="hint" id="syncInfo">Elke telefoon bewaart het hele logboek en deelt het stil met de rest.</p>
+  <ul class="list feed" id="feed"><li class="empty">Nog geen berichten.</li></ul>
+
+  <h2>Statistieken</h2>
+  <div class="seg" id="statScope"><button data-s="day" class="on">Gekozen dag</button><button data-s="all">Hele reis</button></div>
+  <div id="stats"></div>
+
+  <h2>Instellen (1 keer)</h2>
+  <details open>
+    <summary>Meldingen krijgen op je telefoon</summary>
+    <p>1. Installeer de gratis app <b>ntfy</b> (App Store of Google Play).<br>
+    2. Tik op <b>+</b> en abonneer je op het kanaal: <code id="topicTxt"></code>
+    <button class="chip" id="copyTopic" type="button">Kopieer</button><br>
+    3. Zet meldingen voor ntfy aan. Klaar.</p>
+  </details>
+  <details>
+    <summary>Deze pagina als app op je beginscherm</summary>
+    <p><b>iPhone:</b> open in Safari → deelknop → "Zet op beginscherm".<br>
+    <b>Android:</b> Chrome → ⋮ → "Toevoegen aan startscherm".<br>
+    De namen van liften, pistes en restaurants haalt de app één keer op uit OpenStreetMap en bewaart ze op je telefoon. Doe dat het liefst op wifi: <button class="chip" id="placesBtn" type="button">Namen ophalen</button> <span class="m" id="placesInfo"></span><br>
+    Sta locatie <b>altijd</b> toe als de telefoon erom vraagt, dan hoeft dat daarna nooit meer.</p>
+  </details>
+  <details>
+    <summary>Goed om te weten</summary>
+    <p>Tik je op een melding "Waar zijn jullie?" of "Foto-verzoek", dan opent de app en stuurt hij meteen je positie, zonder extra tik. Werkt alleen met internet. Iedereen met de kanaalnaam kan meelezen, dus deel hem alleen in de groep. Bij een echt noodgeval: bel <b>112</b>.</p>
+  </details>
+</main>
+
+<dialog id="nameDlg">
+  <form method="dialog" id="nameForm">
+    <h2 style="margin-top:0">Hoe heet je?</h2>
+    <p class="empty">Zo zien de anderen van wie een melding komt.</p>
+    <input id="nameIn" maxlength="24" placeholder="Je naam" required>
+    <div class="row"><button class="send" style="flex:1">Opslaan</button></div>
+  </form>
+</dialog>
+<dialog id="destDlg">
+  <form method="dialog" id="destForm">
+    <h2 style="margin-top:0" id="stepTitle">Stap 1</h2>
+    <div class="types" id="types"></div>
+    <div class="sugg" id="destSugg"></div>
+    <input id="destIn" maxlength="60" placeholder="Of typ zelf een naam">
+    <div class="row"><button class="chip" value="cancel" style="flex:1">Annuleer</button><button class="send" value="ok" style="flex:1">Toevoegen</button></div>
+  </form>
+</dialog>
+<dialog id="dayDlg">
+  <form method="dialog">
+    <h2 style="margin-top:0">Dag toevoegen</h2>
+    <input type="date" id="dayIn" style="font:inherit;font-size:16px;width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);min-height:48px">
+    <div class="row"><button class="chip" value="cancel" style="flex:1">Annuleer</button><button class="send" value="ok" style="flex:1">Toevoegen</button></div>
+  </form>
+</dialog>
+<dialog id="tapDlg">
+  <form method="dialog">
+    <h2 style="margin-top:0" id="tapTitle">Ik ben hier</h2>
+    <p class="empty" id="tapText">Deze plek gaat naar de hele groep.</p>
+    <div class="sugg" id="tapSugg"></div>
+    <input id="tapIn" maxlength="60" placeholder="Of typ zelf een naam">
+    <div class="row"><button class="chip" value="cancel" style="flex:1">Annuleer</button><button class="send" value="ok" style="flex:1">Stuur naar groep</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="outbox.js"></script>
+<script>
+{
+const store0 = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+{ const m = /^#kanaal-([a-z0-9-]{8,64})$/.exec(location.hash); if(m) store0.set('ski-topic', m[1]) }
+const TOPIC = store0.get('ski-topic') || '';
+const NTFY = 'https://ntfy.sh';
+const OLD_MIN = 30, GONE_MIN = 180, DEST_GONE_MIN = 720;   // oud na 30 min, weg na 3 uur; bestemming 12 uur
+const TIGNES = [45.4685, 6.9060];
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const appUrl = location.href.split('#')[0];
+let name = store.get('ski-name') || '';
+let lastEvents = [], myPos = null, map = null, layer = null, marking = false, pendingDest = null, lastKey = '', bounds = [];
+
+$('#topicTxt').textContent = TOPIC || '(open eerst de uitnodigingslink)';
+if(!TOPIC) $('#noTopic').classList.add('on');
+$('#joinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#joinIn').value.trim(), m = /(?:#kanaal-)?([a-z0-9-]{8,64})\s*$/.exec(v);
+  if(!m){ toast('Dat lijkt geen uitnodigingslink'); return }
+  store.set('ski-topic', m[1]); location.replace(appUrl + '#kanaal-' + m[1]); location.reload();
+});
+
+function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>el.classList.remove('on'),2800)}
+function showName(){ $('#meBtn').textContent = name ? '👤 ' + name : 'Naam instellen' }
+function askName(){ $('#nameIn').value = name; try{$('#nameDlg').showModal()}catch(e){} }
+showName();
+$('#meBtn').addEventListener('click', askName);
+$('#nameForm').addEventListener('submit', () => { name = $('#nameIn').value.trim().slice(0,24); store.set('ski-name', name); showName(); handleHash(); });
+
+/* ---------- positie ---------- */
+function getPos(timeout=15000){
+  return new Promise((res, rej) => {
+    if(!navigator.geolocation) return rej(new Error('Geen GPS beschikbaar'));
+    navigator.geolocation.getCurrentPosition(
+      p => { myPos = {lat:p.coords.latitude, lon:p.coords.longitude, acc:Math.round(p.coords.accuracy)}; res(myPos) },
+      e => rej(new Error(e.code===1 ? 'Locatie geweigerd. Sta locatie toe in je instellingen.' : 'Positie niet gevonden, probeer opnieuw.')),
+      {enableHighAccuracy:true, timeout, maximumAge:0});   // altijd een verse positie
+  });
+}
+const fix = p => `📍 ${p.lat.toFixed(5)},${p.lon.toFixed(5)} (±${p.acc} m)`;
+const focusUrl = p => `${appUrl}#naar-${(+p.lat).toFixed(5)}_${(+p.lon).toFixed(5)}`;
+const mapsUrl = p => `https://www.google.com/maps/search/?api=1&query=${p.lat.toFixed(5)},${p.lon.toFixed(5)}`;
+const clock = ts => new Date(ts*1000).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+const ageMin = ts => (Date.now()/1000 - ts) / 60;
+function ago(ts){ const m=Math.round(ageMin(ts)); return m<1?'net nu':m<60?m+' min geleden':Math.floor(m/60)+' u '+(m%60)+' min geleden' }
+function dist(a,b){ const R=6371000,t=Math.PI/180,dl=(b.lat-a.lat)*t,dn=(b.lon-a.lon)*t; const x=Math.sin(dl/2)**2+Math.cos(a.lat*t)*Math.cos(b.lat*t)*Math.sin(dn/2)**2; return 2*R*Math.asin(Math.sqrt(x)) }
+const fmtD = m => m<1000 ? Math.round(m)+' m' : (m/1000).toFixed(1)+' km';
+
+/* ---------- versturen ---------- */
+/* ---------- wachtrij: geen bereik? dan later vanzelf versturen ---------- */
+// De wachtrij staat in IndexedDB (outbox.js). Android verstuurt hem op de achtergrond via de service worker;
+// iPhone zodra de app weer open gaat.
+async function refreshOutBanner(){
+  const n = (await SG.list()).length;
+  $('#outBanner').classList.toggle('on', n > 0);
+  $('#outBanner').textContent = n ? `⏳ ${n} ${n === 1 ? 'bericht wacht' : 'berichten wachten'} op bereik. Ze gaan vanzelf weg zodra je bereik hebt (tik om nu te proberen).` : '';
+}
+$('#outBanner').addEventListener('click', () => flushOutbox());
+let flushing = false;
+async function flushOutbox(){
+  if(flushing || !TOPIC) return;
+  flushing = true;
+  try{
+    const r = await SG.flush();
+    if(r && r.sent){ toast(`${r.sent} ${r.sent === 1 ? 'wachtend bericht' : 'wachtende berichten'} alsnog verstuurd ✓`); setTimeout(load, 800) }
+  }catch(e){}
+  flushing = false;
+  refreshOutBanner();
+}
+async function enqueue(item){
+  await SG.add({...item, t:item.t || Date.now()});
+  try{   // Android: laat de telefoon zelf versturen zodra er bereik is, ook als de app dicht gaat
+    const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
+    if(reg && reg.sync) await reg.sync.register('outbox');
+  }catch(e){}
+  refreshOutBanner();
+}
+window.addEventListener('online', () => flushOutbox());
+// berichten uit een eerdere versie (in localStorage) overzetten
+(async () => {
+  try{
+    const old = JSON.parse(store.get('ski-outbox') || '[]');
+    if(Array.isArray(old) && old.length){ for(const it of old) await SG.add({...it, topic: it.topic || TOPIC}); localStorage.removeItem('ski-outbox') }
+  }catch(e){}
+  refreshOutBanner();
+})();
+
+async function post(body, okText, {queue=true} = {}){
+  if(!TOPIC){ toast('Open eerst de uitnodigingslink'); return false }
+  const item = {kind:'post', body:{topic:TOPIC, title:name, ...body}, t:Date.now()};
+  if(!(await SG.list()).length){
+    const res = await SG.sendOne(item);
+    if(res === 'ok'){ if(okText) toast(okText); setTimeout(load, 800); return true }
+    if(res === 'drop' || !queue){ if(okText) toast('Niet verstuurd'); return false }
+  }else if(!queue) return false;
+  await enqueue(item);   // achter eventuele eerdere berichten, zodat de volgorde klopt
+  toast('Geen bereik ⏳ Gaat vanzelf weg zodra je bereik hebt');
+  flushOutbox();
+  return true;
+}
+async function send(msg, {loc=false, prio=4, quiet=false, tags=[], queue=true} = {}){
+  if(!name){ askName(); return }
+  const body = {message:msg, priority:prio, tags:[...tags]};
+  if(prio===5 && !tags.length) body.tags.push('rotating_light');
+  if(loc){
+    if(!quiet) toast('Positie zoeken…');
+    try{
+      const p = await getPos();
+      const near = nearName(p.lat, p.lon);
+      body.message = `${msg}${near ? ' · bij ' + near : ''}\n${fix(p)}`;
+      body.click = mapsUrl(p);
+      body.actions = [{action:'view', label:'Open kaart', url:mapsUrl(p)}, {action:'view', label:'Open app', url:appUrl}];
+      body.tags.push('round_pushpin');
+    }catch(e){
+      toast(e.message);
+      if(prio < 5) return;   // SOS gaat altijd door, ook zonder positie
+      body.message = msg + '\n(positie niet beschikbaar)';
+    }
+  }
+  return post(body, quiet ? '' : 'Verstuurd naar de groep ✓', {queue});
+}
+
+document.querySelectorAll('[data-msg],[data-pos],[data-req]').forEach(b => b.addEventListener('click', () => {
+  if(!name){ askName(); return }
+  if(b.dataset.req === 'pos') return post({message:'📍 Waar zijn jullie? Tik hier, je positie gaat dan automatisch.', priority:4, tags:['question'], click:appUrl+'#pos'}, 'Verzoek verstuurd ✓');
+  if(b.dataset.req === 'foto') return post({message:'📸 Maak een foto van waar je bent! Tik hier, je positie gaat automatisch.', priority:4, tags:['camera'], click:appUrl+'#foto'}, 'Foto-verzoek verstuurd ✓');
+  if(b.dataset.pos) return send('Hier ben ik', {loc:true, prio:3});
+  send(b.dataset.msg, {loc:!!b.dataset.loc, prio:+(b.dataset.prio||4), tags: b.dataset.tags ? b.dataset.tags.split(',') : []});
+}));
+$('#free').addEventListener('submit', e => { e.preventDefault(); const t=$('#freeTxt').value.trim(); if(t){ send(t); $('#freeTxt').value='' } });
+$('#copyTopic').addEventListener('click', async () => { try{ await navigator.clipboard.writeText(TOPIC); toast('Gekopieerd') }catch(e){ toast(TOPIC) } });
+
+/* ---------- foto ---------- */
+function shrink(file){   // max 1600px, scheelt data
+  return new Promise((res, rej) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const s = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width*s); c.height = Math.round(img.height*s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res(b) : rej(new Error('foto')), 'image/jpeg', 0.8);
+    };
+    img.onerror = () => rej(new Error('foto'));
+    img.src = url;
+  });
+}
+$('#photoIn').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if(!f) return;
+  if(!name){ askName(); return }
+  if(!TOPIC){ toast('Open eerst de uitnodigingslink'); return }
+  $('#photoBanner').classList.remove('on');
+  toast('Foto versturen…');
+  let msg = '📷 Hier ben ik';
+  try{ msg += '\n' + fix(await getPos(8000)) }catch(err){}
+  const blob = await shrink(f).catch(() => f);
+  const item = {kind:'photo', uid:'p' + Date.now() + Math.random().toString(36).slice(2,6), t:Date.now(), topic:TOPIC,
+    q:{title:name, message:msg, filename:'foto.jpg', tags:'camera', click:appUrl}};
+  if(!(await SG.list()).length){   // direct proberen, met de foto uit het geheugen
+    try{
+      const r = await fetch(`${NTFY}/${TOPIC}?${new URLSearchParams(item.q)}`, {method:'PUT', body:blob});
+      if(r.ok){ const j = await r.json().catch(() => null); if(j && j.id) photoPut(j.id, blob); toast('Foto verstuurd ✓'); setTimeout(load, 800); return }
+    }catch(err){}
+  }
+  if(!(await SG.put('photos', 'out-' + item.uid, blob))){ toast('Foto niet verstuurd en kon hem niet bewaren'); return }
+  await enqueue(item);
+  toast('Geen bereik ⏳ Foto gaat vanzelf weg zodra je bereik hebt');
+  flushOutbox();
+});
+
+/* ---------- automatisch delen ---------- */
+let autoTimer = null;
+function setAuto(on){
+  clearInterval(autoTimer); autoTimer = null;
+  store.set('ski-auto', on ? '1' : '0');
+  if(on){ send('Automatische positie', {loc:true, prio:2, quiet:true, queue:false}); autoTimer = setInterval(() => { if(!document.hidden) send('Automatische positie', {loc:true, prio:2, quiet:true, queue:false}) }, 5*60*1000) }
+}
+$('#autoSw').addEventListener('change', e => { if(!name){ e.target.checked=false; askName(); return } setAuto(e.target.checked); toast(e.target.checked ? 'Automatisch delen aan' : 'Automatisch delen uit') });
+
+/* ---------- geopend via een melding: direct positie sturen ---------- */
+function handleHash(){
+  const h = location.hash.slice(1);
+  if(h.startsWith('plan-')){
+    try{ const p = JSON.parse(decodeURIComponent(escape(atob(h.slice(5).replace(/-/g,'+').replace(/_/g,'/'))))); mergePlan(p); selDay = p.date; savePlans() }catch(e){}
+    history.replaceState(null, '', appUrl); renderAll(); return;
+  }
+  const fm = /^naar-(-?\d+\.\d+)_(-?\d+\.\d+)$/.exec(h);
+  if(fm){
+    history.replaceState(null, '', appUrl);
+    const go = () => { if(!map) return setTimeout(go, 300); map.setView([+fm[1], +fm[2]], 16); lastKey = 'focus'; $('#map').scrollIntoView({behavior:'smooth', block:'center'}) };
+    go(); return;
+  }
+  if(h !== 'pos' && h !== 'foto') return;
+  if(!name){ askName(); return }
+  history.replaceState(null, '', appUrl);
+  send(h === 'foto' ? 'Hier ben ik (foto volgt)' : 'Hier ben ik', {loc:true, prio:2, quiet:true}).then(ok => { if(ok) toast('Je positie is verstuurd ✓') });
+  if(h === 'foto') $('#photoBanner').classList.add('on');
+}
+
+/* ---------- kaart ---------- */
+function initMap(){
+  if(map || !window.L) return;
+  map = L.map('map').setView(TIGNES, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:18, attribution:'© OpenStreetMap'}).addTo(map);
+  L.tileLayer('https://tiles.opensnowmap.org/pistes/{z}/{x}/{y}.png', {maxZoom:18, attribution:'Pistes © OpenSnowMap'}).addTo(map);
+  layer = L.layerGroup().addTo(map);
+  map.on('zoomend', showPoi);
+  setTimeout(buildPoi, 0);
+  map.on('click', e => {
+    if(!marking){ if(mapMode !== 'look') tapOnMap(e.latlng); return }
+    pendingDest = {lat:e.latlng.lat, lon:e.latlng.lng};
+    $('#stepTitle').textContent = 'Stap ' + (draft.length + 1) + ' · ' + dayName(selDay).toLowerCase();
+    $('#destIn').value = '';
+    pickType(TYPES[0]);
+    try{ $('#destDlg').showModal() }catch(err){}
+    suggest('#destSugg', '#destIn', e.latlng.lat, e.latlng.lng);
+  });
+}
+
+/* ---------- plaatsnamen: liften, pistes, restaurants uit OpenStreetMap ---------- */
+// Eén keer ophalen voor Tignes + Val d'Isère, daarna staat alles op de telefoon (ook zonder bereik).
+const BBOX = '45.40,6.84,45.53,7.07';
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const PLACES_VERSION = 1;
+let places = null;
+try{ const c = JSON.parse(store.get('ski-places') || 'null'); if(c && c.v === PLACES_VERSION && Array.isArray(c.f)) places = c }catch(e){}
+const LIFT = {chair_lift:'🚡 Stoeltjeslift', gondola:'🚠 Gondel', cable_car:'🚠 Kabelbaan', mixed_lift:'🚠 Lift', drag_lift:'⛷️ Sleeplift', 't-bar':'⛷️ Sleeplift', j_bar:'⛷️ Sleeplift', platter:'⛷️ Sleeplift', rope_tow:'⛷️ Sleeplift', magic_carpet:'🟫 Loopband', funicular:'🚞 Funiculaire'};
+const PISTE = {novice:'🟢 Piste', easy:'🔵 Piste', intermediate:'🔴 Piste', advanced:'⚫ Piste', expert:'⚫ Piste', freeride:'🏔️ Freeride'};
+function placeKind(t){
+  if(t.aerialway === 'station') return '🚉 Liftstation';
+  if(t.aerialway) return LIFT[t.aerialway] || '🚡 Lift';
+  if(t['piste:type']) return PISTE[t['piste:difficulty']] || '⛷️ Piste';
+  if(t.amenity === 'restaurant' || t.amenity === 'fast_food') return '🍽️';
+  if(t.amenity === 'bar' || t.amenity === 'pub') return '🍺';
+  if(t.amenity === 'cafe') return '☕';
+  if(t.natural === 'peak') return '⛰️';
+  if(t.place) return '🏘️';
+  return '📍';
+}
+function infoPlaces(){ $('#placesInfo').textContent = places ? `${places.f.length} namen op deze telefoon` : 'nog niet opgehaald' }
+async function fetchPlaces(force){
+  if(places && !force && Date.now() - places.t < 14*864e5) return places;
+  if(fetchPlaces.busy) return fetchPlaces.busy;
+  const q = `[out:json][timeout:60];(way["aerialway"]["name"](${BBOX});node["aerialway"="station"]["name"](${BBOX});way["piste:type"="downhill"](${BBOX});nwr["amenity"~"^(restaurant|bar|pub|cafe|fast_food)$"]["name"](${BBOX});node["natural"="peak"]["name"](${BBOX});node["place"~"^(village|hamlet|locality|neighbourhood)$"]["name"](${BBOX}););out tags geom;`;
+  fetchPlaces.busy = (async () => {
+    for(const url of OVERPASS){
+      try{
+        const r = await fetch(url, {method:'POST', body:'data=' + encodeURIComponent(q), headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+        if(!r.ok) continue;
+        const j = await r.json(), f = [], seen = new Set();
+        for(const el of j.elements || []){
+          const t = el.tags || {};
+          const nm = (t['piste:name'] || t.name || '').trim();
+          if(!nm) continue;
+          let pts = el.type === 'node' ? [[el.lat, el.lon]] : (el.geometry || []).map(g => [g.lat, g.lon]);
+          if(el.type === 'relation' && el.center) pts = [[el.center.lat, el.center.lon]];
+          if(!pts.length) continue;
+          if(pts.length > 30){ const step = Math.ceil(pts.length / 30); pts = pts.filter((p,i) => i % step === 0 || i === pts.length-1) }
+          const k = placeKind(t), key = k + nm + pts[0].join();
+          if(seen.has(key)) continue; seen.add(key);
+          f.push({k, n:nm.slice(0,60), p:pts.map(([a,b]) => [+a.toFixed(5), +b.toFixed(5)])});
+        }
+        if(!f.length) continue;
+        places = {v:PLACES_VERSION, t:Date.now(), f};
+        try{ localStorage.setItem('ski-places', JSON.stringify(places)) }catch(e){}
+        infoPlaces();
+        buildPoi();
+        load();   // gedeelde plekken opnieuw tekenen met het juiste icoon
+        return places;
+      }catch(e){}
+    }
+    return places;
+  })();
+  const res = await fetchPlaces.busy; fetchPlaces.busy = null; return res;
+}
+// afstand van een punt tot een lijnstuk, in meters (vlakke benadering, prima op skigebied-schaal)
+function segDist(p, a, b){
+  const k = Math.cos(p[0]*Math.PI/180), X = q => (q[1]-p[1])*111320*k, Y = q => (q[0]-p[0])*110540;
+  const ax = X(a), ay = Y(a), bx = X(b), by = Y(b), dx = bx-ax, dy = by-ay;
+  const t = dx||dy ? Math.max(0, Math.min(1, -(ax*dx + ay*dy)/(dx*dx + dy*dy))) : 0;
+  return Math.hypot(ax + t*dx, ay + t*dy);
+}
+function nearest(lat, lon, n=3, maxM=800){
+  if(!places) return [];
+  const p = [lat, lon], best = new Map();
+  for(const f of places.f){
+    let d = Infinity;
+    if(f.p.length === 1) d = segDist(p, f.p[0], f.p[0]);
+    else for(let i = 1; i < f.p.length; i++) d = Math.min(d, segDist(p, f.p[i-1], f.p[i]));
+    if(d > maxM) continue;
+    const label = `${f.k} ${f.n}`;
+    const prev = best.get(label);
+    if(!prev || d < prev.d) best.set(label, {label, name:f.n, d});
+  }
+  return [...best.values()].sort((a,b) => a.d - b.d).slice(0, n);
+}
+async function suggest(boxSel, inputSel, lat, lon){
+  const box = $(boxSel), input = $(inputSel);
+  box.innerHTML = places ? '' : '<p class="m" style="margin:0">Plaatsnamen ophalen…</p>';
+  if(!places) await fetchPlaces();
+  const list = nearest(lat, lon);
+  if(!list.length){ box.innerHTML = places ? '<p class="m" style="margin:0">Geen lift, piste of restaurant in de buurt. Typ zelf een naam.</p>' : '<p class="m" style="margin:0">Plaatsnamen niet beschikbaar (geen verbinding?). Typ zelf een naam.</p>'; return }
+  box.innerHTML = list.map((x,i) => `<button type="button" class="${i===0?'on':''}" data-i="${i}"><span>${esc(x.label)}</span><span class="d">${esc(fmtD(x.d))}</span></button>`).join('');
+  input.value = list[0].label;
+  box.onclick = e => { const b = e.target.closest('[data-i]'); if(!b) return; input.value = list[+b.dataset.i].label; box.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)) };
+}
+/* ---------- restaurants, bars en cafés op de kaart ---------- */
+let poiLayer = null, poiOn = store.get('ski-poi') !== '0';
+const POI_ZOOM = 14;   // pas tonen als je ingezoomd bent, anders wordt de kaart te druk
+function buildPoi(){
+  if(!map || !places) return;
+  if(poiLayer) poiLayer.remove();
+  poiLayer = L.layerGroup();
+  for(const f of places.f){
+    if(!/^(🍽️|🍺|☕)$/u.test(f.k)) continue;
+    const lat = f.p.reduce((a,p) => a + p[0], 0) / f.p.length, lon = f.p.reduce((a,p) => a + p[1], 0) / f.p.length;
+    const icon = L.divIcon({className:'', html:`<div class="poi${f.k === '🍽️' ? '' : ' bar'}">${f.k}</div>`, iconSize:[28,28], iconAnchor:[14,14]});
+    const pt = {lat, lon};
+    L.marker([lat, lon], {icon}).bindPopup(`<div class="poipop"><b>${esc(f.k + ' ' + f.n)}</b><button type="button" data-poigo="${esc(lat + ',' + lon)}" data-poiname="${esc(f.n)}">🎯 Ik ga hierheen</button><a href="${esc(mapsUrl(pt))}" target="_blank" rel="noopener">Route ›</a></div>`, {minWidth:180}).addTo(poiLayer);
+  }
+  showPoi();
+}
+function showPoi(){
+  if(!map || !poiLayer) return;
+  const want = poiOn && map.getZoom() >= POI_ZOOM;
+  if(want && !map.hasLayer(poiLayer)) poiLayer.addTo(map);
+  if(!want && map.hasLayer(poiLayer)) poiLayer.remove();
+  $('#poiBtn').classList.toggle('on', poiOn);
+}
+$('#poiBtn').addEventListener('click', () => {
+  poiOn = !poiOn; store.set('ski-poi', poiOn ? '1' : '0');
+  if(poiOn && !places) fetchPlaces().then(buildPoi);
+  showPoi();
+  if(poiOn && map && map.getZoom() < POI_ZOOM) toast('Zoom verder in om restaurants te zien');
+});
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-poigo]'); if(!b) return;
+  if(!name){ askName(); return }
+  const [lat, lon] = b.dataset.poigo.split(',').map(Number), p = {lat, lon};
+  map.closePopup();
+  await post({message:`🎯 Ik ga naar: ${b.dataset.poiname}\n📍 ${lat.toFixed(5)},${lon.toFixed(5)} (±0 m)`, priority:4, tags:['dart'], click:focusUrl(p), actions:[{action:'view', label:'Bekijk op kaart', url:focusUrl(p)}, {action:'view', label:'Route', url:mapsUrl(p)}]}, 'Gedeeld waar je heen gaat ✓');
+});
+
+const nearName = (lat, lon) => { const x = nearest(lat, lon, 1, 300)[0]; return x ? x.label : '' };
+$('#placesBtn').addEventListener('click', async () => { toast('Namen ophalen…'); const p = await fetchPlaces(true); toast(p ? `${p.f.length} namen bewaard ✓` : 'Ophalen mislukt, probeer later op wifi') });
+infoPlaces();
+setTimeout(() => { if(TOPIC) fetchPlaces() }, 3000);
+
+/* ---------- kaart: kijken / ik ben hier / ik ga hierheen ---------- */
+let mapMode = 'look', pendingTap = null, tapMarker = null, meMarker = null;
+const MODE_HINT = {look:'Zoom in met twee vingers. Kies hierboven wat een tik op de kaart doet.', here:'Tik op de kaart waar je nu bent.', go:'Tik op de kaart waar je heen gaat.'};
+function setMapMode(m){
+  mapMode = m;
+  document.querySelectorAll('#mapMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  $('#modeHint').textContent = MODE_HINT[m];
+  $('#map').classList.toggle('tapmode', m !== 'look');
+}
+$('#mapMode').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]'); if(!b) return;
+  if(b.dataset.mode !== 'look' && !name){ askName(); return }
+  if(marking){ draft = []; setMarking(false) }
+  setMapMode(b.dataset.mode);
+});
+function tapOnMap(ll){
+  pendingTap = {lat:ll.lat, lon:ll.lng, acc:0, mode:mapMode};
+  if(tapMarker) tapMarker.remove();
+  tapMarker = L.circleMarker(ll, {radius:10, color:'#fff', weight:3, fillColor:'#e0a100', fillOpacity:1}).addTo(map);
+  $('#tapTitle').textContent = mapMode === 'here' ? '📍 Ik ben hier' : '🎯 Ik ga hierheen';
+  $('#tapText').textContent = mapMode === 'here' ? 'Deze plek gaat als jouw positie naar de hele groep.' : 'De groep ziet waar je heen gaat, met een routeknop.';
+  $('#tapIn').value = '';
+  try{ $('#tapDlg').showModal() }catch(err){}
+  suggest('#tapSugg', '#tapIn', ll.lat, ll.lng);
+}
+$('#tapDlg').addEventListener('close', async () => {
+  if(tapMarker){ tapMarker.remove(); tapMarker = null }
+  const p = pendingTap; pendingTap = null;
+  if($('#tapDlg').returnValue !== 'ok' || !p) return;
+  const label = $('#tapIn').value.trim().replace(/📍|📅|\n/g,'');
+  const at = `📍 ${p.lat.toFixed(5)},${p.lon.toFixed(5)} (±0 m)`;
+  const ok = p.mode === 'here'
+    ? await post({message:`Ik ben hier${label ? ': ' + label : ''} (aangewezen op kaart)\n${at}`, priority:3, tags:['round_pushpin'], click:mapsUrl(p), actions:[{action:'view', label:'Open kaart', url:mapsUrl(p)}, {action:'view', label:'Open app', url:appUrl}]}, 'Je plek is gedeeld ✓')
+    : await post({message:`🎯 Ik ga naar: ${label || 'deze plek'}\n${at}`, priority:4, tags:['dart'], click:focusUrl(p), actions:[{action:'view', label:'Bekijk op kaart', url:focusUrl(p)}, {action:'view', label:'Route', url:mapsUrl(p)}]}, 'Gedeeld waar je heen gaat ✓');
+  if(ok) setMapMode('look');
+});
+$('#meMapBtn').addEventListener('click', async () => {
+  try{
+    const p = await getPos();
+    if(!map) return;
+    if(meMarker) meMarker.remove();
+    meMarker = L.circleMarker([p.lat,p.lon], {radius:8, color:'#fff', weight:3, fillColor:'#1565c0', fillOpacity:1}).bindTooltip('Jij', {direction:'top'}).addTo(map);
+    map.setView([p.lat,p.lon], 16);
+  }catch(e){ toast(e.message) }
+});
+
+/* ---------- routes per dag ---------- */
+// Elke telefoon bewaart de routes zelf, want ntfy onthoudt berichten maar 12 uur.
+const isoDay = d => { const z = new Date(d.getTime() - d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10) };
+const today = () => isoDay(new Date());
+const dayName = d => { const t = today(), tm = isoDay(new Date(Date.now()+864e5)); if(d===t) return 'Vandaag'; if(d===tm) return 'Morgen';
+  return new Date(d+'T12:00').toLocaleDateString('nl-NL',{weekday:'short', day:'numeric', month:'short'}) };
+let plans = {}, extraDays = [];
+try{ plans = JSON.parse(store.get('ski-plans') || '{}') || {}; extraDays = JSON.parse(store.get('ski-days') || '[]') || [] }catch(e){}
+let selDay = today();
+function savePlans(){ store.set('ski-plans', JSON.stringify(plans)); store.set('ski-days', JSON.stringify(extraDays)) }
+function mergePlan(p){   // nieuwste route per dag wint
+  if(!p || !/^\d{4}-\d{2}-\d{2}$/.test(p.date) || !Array.isArray(p.steps) || !p.steps.length) return;
+  const cur = plans[p.date];
+  if(!cur || cur.time < p.time) plans[p.date] = {date:p.date, steps:p.steps.map((s,i) => ({n:i+1, label:String(s.label).slice(0,80), lat:+s.lat, lon:+s.lon})), who:String(p.who||'?'), time:+p.time, cur:1, curTime:+p.time};
+}
+function allDays(){
+  const cutoff = isoDay(new Date(Date.now() - 14*864e5));
+  return [...new Set([today(), ...Object.keys(plans), ...extraDays, ...[...logMap.values()].filter(x => !/^Automatische/.test(x.message)).map(x => isoDay(new Date(x.time*1000)))])].filter(d => d >= cutoff).sort();
+}
+function drawDays(){
+  $('#days').innerHTML = allDays().map(d => `<button class="chip${d===selDay?' sel':''}" data-day="${esc(d)}">${esc(dayName(d))}${plans[d]?'<span class="dot"></span>':''}</button>`).join('')
+    + '<button class="chip" id="addDay">+ Dag</button>';
+}
+$('#days').addEventListener('click', e => {
+  if(e.target.closest('#addDay')){ $('#dayIn').value = isoDay(new Date(Date.now()+864e5)); try{$('#dayDlg').showModal()}catch(err){} return }
+  const c = e.target.closest('[data-day]'); if(!c) return;
+  if(marking || draft.length){ draft = []; marking = false; $('#markBtn').classList.remove('on'); $('#markHint').hidden = true }
+  selDay = c.dataset.day; lastKey = ''; renderAll();
+});
+$('#dayDlg').addEventListener('close', () => {
+  const d = $('#dayIn').value;
+  if($('#dayDlg').returnValue !== 'ok' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+  if(!extraDays.includes(d)) extraDays.push(d);
+  savePlans(); selDay = d; lastKey = ''; renderAll();
+});
+
+const TYPES = ['⛷️ Skiën naar', '🍽️ Eten', '🍺 Après-ski', '📍 Verzamelen', '🚡 Lift'];
+let draft = [], stepType = TYPES[0];
+$('#types').innerHTML = TYPES.map((t,i) => `<button type="button" class="chip" data-t="${i}">${t}</button>`).join('');
+function pickType(t){ stepType = t; document.querySelectorAll('#types .chip').forEach(c => c.classList.toggle('on', TYPES[c.dataset.t] === t)) }
+$('#types').addEventListener('click', e => { const c = e.target.closest('[data-t]'); if(c) pickType(TYPES[c.dataset.t]) });
+function setMarking(on){ marking = on; $('#markBtn').classList.toggle('on', on); $('#markHint').hidden = !on; renderAll() }
+function drawDraft(){
+  $('#markBtn').textContent = marking ? 'Klaar met tikken' : (plans[selDay] ? '✏️ Route ' + dayName(selDay).toLowerCase() + ' aanpassen' : '🗺️ Route maken voor ' + dayName(selDay).toLowerCase());
+  $('#draft').hidden = !draft.length && !marking;
+  $('#draftTitle').textContent = 'Route voor ' + dayName(selDay).toLowerCase();
+  $('#draftList').innerHTML = draft.map((s,i) => `<li>${esc(s.label)} <button class="chip" data-del="${i}" style="min-height:32px;padding:2px 10px">✕</button></li>`).join('') || '<li class="empty">Tik op de kaart voor stap 1</li>';
+  $('#draftSend').disabled = !draft.length;
+}
+$('#draftList').addEventListener('click', e => { const b = e.target.closest('[data-del]'); if(b){ draft.splice(+b.dataset.del, 1); renderAll() } });
+$('#markBtn').addEventListener('click', () => {
+  if(!name){ askName(); return }
+  if(!marking && !draft.length && plans[selDay]) draft = plans[selDay].steps.map(s => ({...s}));   // bestaande route aanpassen
+  setMarking(!marking);
+});
+$('#fitBtn').addEventListener('click', () => { if(map && bounds.length) map.fitBounds(bounds, {padding:[40,40], maxZoom:15}); else if(map) map.setView(TIGNES, 13) });
+$('#destDlg').addEventListener('close', () => {
+  if($('#destDlg').returnValue !== 'ok' || !pendingDest) return;
+  const extra = $('#destIn').value.trim().replace(/📍|📅|\n/g,'');
+  draft.push({...pendingDest, label: extra ? `${stepType}: ${extra}` : stepType});
+  pendingDest = null;
+  renderAll();
+});
+$('#draftClear').addEventListener('click', () => { draft = []; setMarking(false) });
+function planCode(p){ return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'') }
+async function sharePlan(date, steps){
+  const p = {date, who:name, time:Math.floor(Date.now()/1000), steps:steps.map(s => ({label:s.label, lat:+(+s.lat).toFixed(5), lon:+(+s.lon).toFixed(5)}))};
+  const lines = p.steps.map((s,i) => `${i+1}. ${s.label} 📍${s.lat.toFixed(5)},${s.lon.toFixed(5)}`);
+  const ok = await post({message:`🗺️ Route ${new Date(date+'T12:00').toLocaleDateString('nl-NL',{weekday:'short', day:'numeric', month:'short'})}: ${p.steps.map(s => s.label).join(' → ')}\n📅 ${date}\n${lines.join('\n')}`, priority:4, tags:['world_map'],
+    click:appUrl + '#plan-' + planCode(p), actions:[{action:'view', label:'Open route in app', url:appUrl + '#plan-' + planCode(p)}, {action:'view', label:'Route naar stap 1', url:mapsUrl(p.steps[0])}]}, 'Route gedeeld ✓');
+  if(ok){ mergePlan(p); savePlans() }
+  return ok;
+}
+$('#draftSend').addEventListener('click', async () => {
+  if(!draft.length) return;
+  if(await sharePlan(selDay, draft)){ draft = []; setMarking(false) }
+});
+function goStep(plan, n){
+  const s = plan.steps[n-1]; if(!s) return;
+  plan.cur = n; plan.curTime = Math.floor(Date.now()/1000); savePlans();
+  post({message:`➡️ Nu naar stap ${n}: ${s.label}\n📅 ${plan.date}`, priority:4, tags:['arrow_right'], click:mapsUrl(s), actions:[{action:'view', label:'Route', url:mapsUrl(s)}, {action:'view', label:'Open app', url:appUrl}]}, `Stap ${n} gedeeld ✓`);
+}
+const pinIcon = (n, cls) => L.divIcon({className:'', html:`<div class="pin ${cls}">${n}</div>`, iconSize:[30,30], iconAnchor:[15,15]});
+
+/* ---------- logboek: decentraal op elke telefoon ---------- */
+// Elke telefoon bewaart alles wat hij ziet. Om de paar uur stuurt één telefoon het hele logboek
+// stil naar het kanaal <naam>-sync; de anderen voegen het samen. Zo raakt niets kwijt na 12 uur.
+const SYNC_TOPIC = TOPIC ? TOPIC + '-sync' : '';
+const logMap = new Map();
+let seenBundles = new Set();
+try{ for(const x of JSON.parse(store.get('ski-log') || '[]')) logMap.set(x.id, x); seenBundles = new Set(JSON.parse(store.get('ski-bundles') || '[]')) }catch(e){}
+function norm(e){
+  if(!e || typeof e.id !== 'string' || typeof e.time !== 'number') return null;
+  const att = e.att || e.attachment;
+  return {id:e.id.slice(0,40), time:e.time, title:String(e.title||'').slice(0,40), message:String(e.message||'').slice(0,4000),
+    att: att && /^https:\/\//.test(att.url||'') ? {url:String(att.url), type:String(att.type||''), expires:+att.expires||0} : undefined};
+}
+function mergeLog(list){
+  let added = 0;
+  for(const raw of list){
+    const x = norm(raw); if(!x) continue;
+    const cur = logMap.get(x.id);
+    if(!cur){ logMap.set(x.id, x); added++ } else if(x.att && !cur.att){ cur.att = x.att }
+  }
+  return added;
+}
+function saveLog(){
+  const now = Date.now()/1000;
+  for(const [id,x] of logMap){   // opruimen: oude automatische posities en alles ouder dan 3 weken
+    if((/^Automatische positie/.test(x.message) && now - x.time > GONE_MIN*60) || now - x.time > 21*86400) logMap.delete(id);
+  }
+  let arr = [...logMap.values()].sort((a,b) => b.time - a.time);
+  if(arr.length > 4000){ arr = arr.slice(0,4000); logMap.clear(); arr.forEach(x => logMap.set(x.id, x)) }
+  try{ localStorage.setItem('ski-log', JSON.stringify(arr)); localStorage.setItem('ski-bundles', JSON.stringify([...seenBundles].slice(-200))) }catch(e){}
+  return arr;
+}
+let syncing = false;
+async function sync(){
+  if(!TOPIC || syncing || !navigator.onLine) return;
+  syncing = true;
+  try{
+    const now = Date.now()/1000;
+    const r = await fetch(`${NTFY}/${SYNC_TOPIC}/json?poll=1&since=12h`);
+    const bundles = (await r.text()).split('\n').filter(Boolean).map(l => { try{return JSON.parse(l)}catch(e){return null} })
+      .filter(e => e && e.event==='message' && e.attachment && /^https:\/\//.test(e.attachment.url||'') && (!e.attachment.expires || e.attachment.expires > now + 60))
+      .sort((a,b) => b.time - a.time);
+    let added = 0;
+    for(const b of bundles.slice(0,8)){
+      if(seenBundles.has(b.id)) continue;
+      try{ const j = await (await fetch(b.attachment.url)).json(); if(j && Array.isArray(j.log)) added += mergeLog(j.log); seenBundles.add(b.id) }catch(e){}
+    }
+    saveLog();
+    if(added) load();
+    // Is er de laatste 2 uur geen logboek rondgestuurd? Dan doet deze telefoon het.
+    const newest = bundles.length ? bundles[0].time : 0;
+    let sharedAt = newest;
+    if(now - newest > 7200 && logMap.size){
+      await new Promise(res => setTimeout(res, Math.random()*20000));   // niet allemaal tegelijk
+      const arr = saveLog();
+      const q = new URLSearchParams({title:name || '?', message:'logboek ' + arr.length + ' regels', filename:'logboek.json'});
+      const up = await fetch(`${NTFY}/${SYNC_TOPIC}?${q}`, {method:'PUT', body:new Blob([JSON.stringify({v:1, from:name, time:Math.floor(Date.now()/1000), log:arr})], {type:'application/json'})});
+      if(up.ok){ const j = await up.json().catch(() => null); if(j && j.id) seenBundles.add(j.id); saveLog(); sharedAt = Date.now()/1000 }
+    }
+    $('#syncInfo').textContent = `Logboek op deze telefoon: ${logMap.size} regels. ${sharedAt ? 'Laatst rondgestuurd om ' + clock(sharedAt) + '.' : 'Nog niet rondgestuurd.'}`;
+  }catch(e){}
+  syncing = false;
+}
+
+/* ---------- foto's ook op de telefoon bewaren (ntfy wist ze na een paar uur) ---------- */
+const photoUrls = {};
+const photoGet = id => SG.get('photos', id);
+const photoPut = (id, blob) => SG.put('photos', id, blob);
+async function fillPhotos(){
+  for(const img of document.querySelectorAll('img[data-pid]')){
+    const id = img.dataset.pid, x = logMap.get(id);
+    if(photoUrls[id]){ img.src = photoUrls[id]; continue }
+    let blob = await photoGet(id);
+    if(!blob && x && x.att && (!x.att.expires || x.att.expires > Date.now()/1000)){
+      try{ const r = await fetch(x.att.url); if(r.ok){ blob = await r.blob(); photoPut(id, blob) } }catch(e){}
+    }
+    if(blob){
+      photoUrls[id] = URL.createObjectURL(blob); img.src = photoUrls[id];
+      if(!img.nextElementSibling || !img.nextElementSibling.classList.contains('save')){
+        const b = Object.assign(document.createElement('button'), {className:'chip save', textContent:'💾 Bewaar in Foto\'s'});
+        b.onclick = () => savePhoto(blob, (x && x.title) || 'skigroep');
+        img.after(b);
+      }
+    }
+    else { img.replaceWith(Object.assign(document.createElement('span'), {className:'m', textContent:' (foto niet meer beschikbaar)'})) }
+  }
+}
+
+async function savePhoto(blob, who){
+  const file = new File([blob], `skigroep-${who}-${Date.now()}.jpg`, {type: blob.type || 'image/jpeg'});
+  try{
+    if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file]}); return }   // iPhone: kies "Bewaar afbeelding"
+  }catch(e){ if(e && e.name === 'AbortError') return }
+  const a = Object.assign(document.createElement('a'), {href:URL.createObjectURL(file), download:file.name});
+  document.body.append(a); a.click(); a.remove();
+  toast('Foto gedownload');
+}
+
+/* ---------- statistieken, uit het logboek ---------- */
+let statScope = 'day';
+$('#statScope').addEventListener('click', e => { const b = e.target.closest('[data-s]'); if(!b) return; statScope = b.dataset.s; document.querySelectorAll('#statScope button').forEach(x => x.classList.toggle('on', x === b)); load() });
+const KINDS = [
+  ['jeroen', '🚨 Jeroen niet doen', /JEROEN NIET DOEN/],
+  ['sos', '🆘 Hulp', /HULP NODIG/],
+  ['foto', '📷 Foto', /^📷/],
+  ['pos', '📍 Positie', /^(Hier ben ik|Ik ben hier)/],
+  ['go', '🎯 Ik ga hierheen', /^🎯/],
+  ['req', '❓ Verzoek', /^(📍 Waar zijn|📸 Maak)/],
+  ['route', '🗺️ Route', /^(🗺️|➡️)/],
+  ['knop', '💬 Overig', /./]
+];
+const kindOf = m => (KINDS.find(k => k[2].test(m)) || KINDS[KINDS.length-1])[0];
+function bars(rows, cls){
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  return rows.map(([l,n]) => `<div class="bar"><span>${esc(l)}</span><i class="${cls}" style="width:${Math.round(n/max*100)}%"></i><b>${n}</b></div>`).join('');
+}
+function drawStats(events){
+  const all = events.filter(e => !/^Automatische positie/.test(e.message||''));
+  const scoped = statScope === 'all' ? all : all.filter(e => isoDay(new Date(e.time*1000)) === selDay);
+  const per = {};
+  for(const e of scoped){ const w = e.title || '?', k = kindOf(e.message||''); per[w] = per[w] || {total:0}; per[w][k] = (per[w][k]||0) + 1; per[w].total++ }
+  const lastSeen = {};
+  for(const e of events){ const w = e.title || '?'; if(!lastSeen[w] || e.time > lastSeen[w]) lastSeen[w] = e.time }
+  const people = Object.keys(per).sort((a,b) => per[b].total - per[a].total);
+  const scopeTxt = statScope === 'all' ? 'hele reis' : dayName(selDay).toLowerCase();
+  if(!people.length){ $('#stats').innerHTML = `<p class="empty">Nog geen activiteit (${esc(scopeTxt)}).</p>`; return }
+  const jer = people.map(p => [p, per[p].jeroen||0]).filter(r => r[1]).sort((a,b) => b[1]-a[1]);
+  const kinds = KINDS.map(([k,l]) => [l, people.reduce((n,p) => n + (per[p][k]||0), 0)]).filter(r => r[1]);
+  $('#stats').innerHTML = `
+    <div class="panel"><h3>🚨 Wie drukt het vaakst op "Jeroen niet doen"?</h3>
+      ${jer.length ? bars(jer, 'y') + `<p class="m" style="margin:6px 0 0">${jer.reduce((n,r) => n+r[1], 0)} keer (${esc(scopeTxt)})</p>` : `<p class="empty" style="margin:0">Nog niemand (${esc(scopeTxt)}). Jeroen gedraagt zich.</p>`}</div>
+    <div class="panel"><h3>Per persoon</h3>
+      <table class="st"><thead><tr><th>Wie</th><th>Totaal</th><th>🚨</th><th>📷</th><th>📍</th><th>Laatst</th></tr></thead><tbody>
+      ${people.map(p => `<tr><td>${esc(p)}</td><td>${per[p].total}</td><td>${per[p].jeroen||0}</td><td>${per[p].foto||0}</td><td>${(per[p].pos||0)+(per[p].go||0)}</td><td>${lastSeen[p] ? esc(isoDay(new Date(lastSeen[p]*1000)) === today() ? clock(lastSeen[p]) : dayName(isoDay(new Date(lastSeen[p]*1000)))) : ''}</td></tr>`).join('')}
+      </tbody></table></div>
+    <div class="panel"><h3>Per knop</h3>${bars(kinds, 'b')}</div>`;
+}
+
+/* ---------- ophalen en tonen ---------- */
+function renderAll(){ load() }
+async function load(){
+  flushOutbox();
+  let events = [];
+  try{
+    if(!TOPIC) throw 0;
+    const r = await fetch(`${NTFY}/${TOPIC}/json?poll=1&since=12h`);
+    mergeLog((await r.text()).split('\n').filter(Boolean).map(l => { try{return JSON.parse(l)}catch(e){return null} }).filter(e => e && e.event==='message'));
+  }catch(e){}
+  events = saveLog().map(x => ({...x, attachment:x.att}));
+  const coord = s => { const m = /📍\s*(-?\d+\.\d+),(-?\d+\.\d+)\s*\(±(\d+)/.exec(s||''); return m ? {lat:+m[1], lon:+m[2], acc:+m[3]} : null };
+
+  // Logboek van de gekozen dag, met kloktijd
+  const dayLog = events.filter(e => isoDay(new Date(e.time*1000)) === selDay && !/^Automatische positie/.test(e.message||''));
+  $('#feedTitle').textContent = 'Logboek ' + dayName(selDay).toLowerCase();
+  $('#feed').innerHTML = dayLog.length ? dayLog.slice(0,200).map(e => {
+    const img = e.att && /^image\//.test(e.att.type||'image/') ? `<img data-pid="${esc(e.id)}" alt="Foto van ${esc(e.title||'')}" style="display:block;width:100%;max-height:260px;object-fit:cover;border-radius:10px;margin-top:8px;background:var(--line);min-height:80px">` : '';
+    return `<li><b>${esc(e.title||'?')}</b> <span class="m">${esc(clock(e.time))}${selDay===today() ? ' · ' + esc(ago(e.time)) : ''}</span><br>${esc((e.message||'').split('\n')[0])}${img}</li>`;
+  }).join('') : `<li class="empty">Nog niets in het logboek van ${esc(dayName(selDay).toLowerCase())}.</li>`;
+  fillPhotos();
+  drawStats(events);
+
+  // Routes: nieuwe uit ntfy samenvoegen met wat deze telefoon al had
+  for(const e of [...events].reverse()){
+    const msg = e.message || '';
+    if(/^🗺️ (Route|Plan)/.test(msg)){
+      const dm = /📅 (\d{4}-\d{2}-\d{2})/.exec(msg);
+      const steps = msg.split('\n').map(l => /^(\d+)\.\s(.*?)\s📍(-?\d+\.\d+),(-?\d+\.\d+)$/.exec(l)).filter(Boolean).map(m => ({label:m[2], lat:+m[3], lon:+m[4]}));
+      mergePlan({date: dm ? dm[1] : isoDay(new Date(e.time*1000)), who:e.title, time:e.time, steps});
+    }
+    const sm = /^➡️ Nu naar stap (\d+)/.exec(msg);
+    if(sm){
+      const dm = /📅 (\d{4}-\d{2}-\d{2})/.exec(msg), p = plans[dm ? dm[1] : isoDay(new Date(e.time*1000))];
+      if(p && e.time >= p.time && e.time >= p.curTime && +sm[1] <= p.steps.length){ p.cur = +sm[1]; p.curTime = e.time }
+    }
+  }
+  savePlans();
+  drawDays(); drawDraft();
+  const plan = plans[selDay] || null;
+  $('#plan').innerHTML = plan ? `<p class="m" style="margin:0 0 8px">Route ${esc(dayName(selDay).toLowerCase())}, gemaakt door ${esc(plan.who||'?')} om ${esc(clock(plan.time))}</p><ul class="steps">${plan.steps.map(s => {
+      const st = selDay !== today() ? (selDay < today() ? 'done' : '') : s.n < plan.cur ? 'done' : s.n === plan.cur ? 'now' : '';
+      return `<li class="${st}"><span class="num">${s.n}</span><div class="grow"><b>${esc(s.label)}</b><br><span class="m">${st==='now' ? 'Nu, sinds ' + esc(clock(plan.curTime)) : st==='done' ? 'Gedaan' : 'Straks'}${myPos ? ' · ' + esc(fmtD(dist(myPos,s))) : ''}</span></div>${st==='done' ? '' : `<a class="go" href="${esc(mapsUrl(s))}" target="_blank" rel="noopener">Route ›</a>`}</li>`;
+    }).join('')}</ul>${selDay === today() && plan.cur < plan.steps.length ? `<button class="b blue" id="nextStep" style="width:100%">➡️ Op naar stap ${plan.cur+1}<small>${esc(plan.steps[plan.cur].label)}</small></button>` : ''}
+    <button class="chip" id="reshare" style="width:100%;margin-top:8px">Route opnieuw naar de groep sturen</button>`
+    : `<p class="empty">Nog geen route voor ${esc(dayName(selDay).toLowerCase())}. Tik op "Route maken" en zet de stappen op de kaart.</p>`;
+  if(plan && $('#nextStep')) $('#nextStep').onclick = () => goStep(plan, plan.cur + 1);
+  if(plan) $('#reshare').onclick = () => sharePlan(selDay, plan.steps);
+
+  // Laatste positie per persoon; oud na 30 min, weg na 3 uur
+  const last = {};
+  for(const e of events){
+    const c = coord(e.message), who = e.title || '?';
+    if(c && !/^🗺️|^➡️|^🎯/.test(e.message) && !last[who] && ageMin(e.time) < GONE_MIN) last[who] = {...c, who, time:e.time, old: ageMin(e.time) > OLD_MIN};
+  }
+  const ppl = Object.values(last);
+  $('#people').innerHTML = ppl.length ? ppl.map(p =>
+    `<li class="${p.old ? 'old' : ''}"><div><b>${esc(p.who)}</b>${p.old ? '<span class="tag">oud</span>' : ''}<br><span class="m">${esc(clock(p.time))} · ${esc(ago(p.time))}${myPos && p.who!==name ? ' · ' + esc(fmtD(dist(myPos,p))) : ''}</span></div><a class="go" href="${esc(mapsUrl(p))}" target="_blank" rel="noopener">Route ›</a></li>`).join('')
+    : '<li class="empty">Geen posities in de laatste 3 uur.</li>';
+
+  initMap();
+  if(!map) return;
+  layer.clearLayers();
+  bounds = [];
+  for(const p of ppl){
+    L.circleMarker([p.lat,p.lon], {radius:9, color:'#fff', weight:2, fillColor: p.old ? '#8a98a6' : (p.who===name ? '#1b8a4a' : '#d7261e'), fillOpacity:1})
+      .bindTooltip(`${p.who} ${clock(p.time)}${p.old ? ' (oud)' : ''}`, {permanent:true, direction:'top', offset:[0,-8]}).addTo(layer);
+    bounds.push([p.lat,p.lon]);
+  }
+  if(plan){
+    L.polyline(plan.steps.map(s => [s.lat,s.lon]), {color:'#e0a100', weight:4, dashArray:'8 8'}).addTo(layer);
+    for(const s of plan.steps){
+      const st = selDay !== today() ? '' : s.n < plan.cur ? 'done' : s.n === plan.cur ? 'now' : '';
+      L.marker([s.lat,s.lon], {icon:pinIcon(s.n, st)}).bindTooltip(s.label, {direction:'right', offset:[14,0], permanent: st==='now'}).addTo(layer);
+      bounds.push([s.lat,s.lon]);
+    }
+  }
+  const going = {};
+  for(const e of events){ const c = coord(e.message); if(c && /^🎯/.test(e.message||'') && ageMin(e.time) < GONE_MIN && !going[e.title]) going[e.title] = {...c, label:(e.message.split('\n')[0]).replace('🎯 Ik ga naar:','').trim()} }
+  for(const [who, g] of Object.entries(going)){
+    const from = last[who];
+    if(from) L.polyline([[from.lat,from.lon],[g.lat,g.lon]], {color:'#1565c0', weight:3, dashArray:'4 8'}).addTo(layer);
+    const spot = nearest(g.lat, g.lon, 1, 40)[0], emo = spot && /^(🍽️|🍺|☕)/u.exec(spot.label);
+    const gIcon = L.divIcon({className:'', html:`<div class="poi go">${emo ? emo[1] : '🎯'}</div>`, iconSize:[32,32], iconAnchor:[16,16]});
+    L.marker([g.lat,g.lon], {icon:gIcon, zIndexOffset:1000}).bindTooltip(`${who} → ${g.label}`, {permanent:true, direction:'right', offset:[14,0]})
+      .bindPopup(`<div class="poipop"><b>${esc(g.label)}</b><span class="m">${esc(who)} gaat hierheen</span><button type="button" data-poigo="${esc(g.lat + ',' + g.lon)}" data-poiname="${esc(g.label)}">🎯 Ik ga ook</button><a href="${esc(mapsUrl(g))}" target="_blank" rel="noopener">Route ›</a></div>`, {minWidth:180}).addTo(layer);
+    bounds.push([g.lat,g.lon]);
+  }
+  if(draft.length){
+    L.polyline(draft.map(s => [s.lat,s.lon]), {color:'#e0a100', weight:3, dashArray:'2 6'}).addTo(layer);
+    draft.forEach((s,i) => L.marker([s.lat,s.lon], {icon:pinIcon(i+1, ''), opacity:.8}).addTo(layer));
+  }
+  const key = selDay + JSON.stringify(going) + ppl.map(p => p.who+p.time).join() + (plan ? plan.time + '-' + plan.cur : '');
+  if(lastKey === 'focus'){ lastKey = key; return }
+  if(key !== lastKey && bounds.length && !marking){ map.fitBounds(bounds, {padding:[40,40], maxZoom:15}) }   // alleen herschikken als er iets nieuws is
+  lastKey = key;
+}
+
+if('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+if(!/iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)){
+  document.head.append(Object.assign(document.createElement('link'), {rel:'manifest', href:'manifest.json'}));
+}
+initMap();
+if(!name) askName();
+handleHash();
+if(store.get('ski-auto') === '1' && name){ $('#autoSw').checked = true; setAuto(true) }
+load();
+setInterval(() => { if(!document.hidden) load() }, 30000);
+setTimeout(sync, 1500);
+setInterval(() => { if(!document.hidden) sync() }, 10*60*1000);
+document.addEventListener('visibilitychange', () => { if(!document.hidden){ load(); sync() } });
+window.addEventListener('hashchange', handleHash);
+}
+</script>
+</body>
+</html>
